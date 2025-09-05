@@ -150,6 +150,7 @@ class GroupsViewModel @Inject constructor(@ApplicationContext val context: Conte
         name: String,
         description: String,
         imageUri: Uri? = null,
+        removeImage: Boolean = false,
         onComplete: (Boolean, String?) -> Unit
     ) {
         val currentUser = auth.currentUser
@@ -166,35 +167,49 @@ class GroupsViewModel @Inject constructor(@ApplicationContext val context: Conte
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val group = snapshot.getValue(Group::class.java)
                     if (group != null && group.participants.containsKey(currentUser.uid)) {
-                        // Usuário é membro, pode editar
+                        // Qualquer membro pode editar
                         viewModelScope.launch {
                             try {
                                 val updates = mutableMapOf<String, Any>()
                                 updates["name"] = name
                                 updates["description"] = description
 
-                                if (imageUri != null) {
-                                    val imageUrl = SupabaseStorageUtils.uploadImageToSupabase(context, imageUri)
-                                    if (imageUrl != null) {
-                                        updates["imageUrl"] = imageUrl
+                                when {
+                                    // Remover imagem se removeImage for true
+                                    removeImage -> {
+                                        updates["imageUrl"] = ""
                                     }
+                                    // Fazer upload de nova imagem se imageUri não for null
+                                    imageUri != null -> {
+                                        val imageUrl = SupabaseStorageUtils.uploadImageToSupabase(context, imageUri)
+                                        if (imageUrl != null) {
+                                            updates["imageUrl"] = imageUrl
+                                        }
+                                    }
+                                    // Se imageUri for null e removeImage for false, manter imagem atual (não atualizar)
                                 }
 
                                 db.reference.child("groups").child(groupId).updateChildren(updates)
                                     .addOnCompleteListener { task ->
                                         _isLoading.value = false
                                         if (task.isSuccessful) {
+                                            // Recarregar a lista de grupos para refletir mudanças
+                                            loadGroups()
+                                            // Recarregar o grupo atual se estiver carregado
+                                            if (_currentGroup.value?.id == groupId) {
+                                                loadGroup(groupId)
+                                            }
                                             onComplete(true, null)
                                         } else {
                                             onComplete(false, "Erro ao atualizar grupo")
                                         }
                                     }
 
-                            } catch (e: Exception) {
-                                _isLoading.value = false
-                                onComplete(false, e.message)
+                                } catch (e: Exception) {
+                                    _isLoading.value = false
+                                    onComplete(false, e.message)
+                                }
                             }
-                        }
                     } else {
                         _isLoading.value = false
                         onComplete(false, "Apenas membros do grupo podem editá-lo")

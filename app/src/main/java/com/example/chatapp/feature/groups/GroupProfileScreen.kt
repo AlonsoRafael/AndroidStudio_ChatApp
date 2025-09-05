@@ -1,5 +1,8 @@
 package com.example.chatapp.feature.groups
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +16,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +35,7 @@ import coil.compose.AsyncImage
 import com.example.chatapp.R
 import com.example.chatapp.model.Contact
 import com.example.chatapp.model.Group
+import com.example.chatapp.ui.component.DefaultAvatar
 import com.example.chatapp.ui.theme.Blue
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -48,6 +53,31 @@ fun GroupProfileScreen(
     
     var showAddMembersDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var showPhotoMenu by remember { mutableStateOf(false) }
+    
+    // Launcher para seleção de imagem
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+        uri?.let {
+            group?.let { currentGroup ->
+                viewModel.updateGroup(
+                    groupId = currentGroup.id,
+                    name = currentGroup.name,
+                    description = currentGroup.description,
+                    imageUri = it,
+                    onComplete = { success, error ->
+                        if (!success) {
+                            // Handle error if needed
+                        }
+                    }
+                )
+            }
+        }
+    }
     
     LaunchedEffect(groupId) {
         viewModel.loadGroup(groupId)
@@ -93,29 +123,86 @@ fun GroupProfileScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             // Foto do grupo
-                            if (g.imageUrl != null) {
-                                AsyncImage(
-                                    model = g.imageUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(120.dp)
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(120.dp)
-                                        .clip(CircleShape)
-                                        .background(Blue.copy(alpha = 0.2f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.Person,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(60.dp),
-                                        tint = Blue
+                            Box(
+                                contentAlignment = Alignment.BottomEnd
+                            ) {
+                                if (g.imageUrl != null && g.imageUrl.isNotEmpty()) {
+                                    AsyncImage(
+                                        model = g.imageUrl,
+                                        contentDescription = "Foto do grupo",
+                                        modifier = Modifier
+                                            .size(120.dp)
+                                            .clip(CircleShape)
+                                            .border(2.dp, Blue, CircleShape),
+                                        contentScale = ContentScale.Crop
                                     )
+                                } else {
+                                    DefaultAvatar(
+                                        size = 120.dp,
+                                        backgroundColor = Color(0xFFF5F5F5)
+                                    )
+                                }
+                                
+                                // Botão de editar foto (visível apenas para membros do grupo)
+                                if (g.participants.containsKey(currentUser?.uid)) {
+                                    Box {
+                                        IconButton(
+                                            onClick = { 
+                                                if (g.imageUrl != null) {
+                                                    showPhotoMenu = true
+                                                } else {
+                                                    imagePickerLauncher.launch("image/*")
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .background(Blue, CircleShape)
+                                        ) {
+                                            Icon(
+                                                if (g.imageUrl != null) Icons.Default.MoreVert else Icons.Default.Add,
+                                                contentDescription = if (g.imageUrl != null) "Opções da foto" else "Alterar foto do grupo",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        
+                                        // Menu dropdown para foto existente
+                                        DropdownMenu(
+                                            expanded = showPhotoMenu,
+                                            onDismissRequest = { showPhotoMenu = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Alterar foto") },
+                                                onClick = {
+                                                    showPhotoMenu = false
+                                                    imagePickerLauncher.launch("image/*")
+                                                },
+                                                leadingIcon = {
+                                                    Icon(Icons.Default.Add, contentDescription = null)
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Remover foto") },
+                                                onClick = {
+                                                    showPhotoMenu = false
+                                                    viewModel.updateGroup(
+                                                        groupId = g.id,
+                                                        name = g.name,
+                                                        description = g.description,
+                                                        removeImage = true,
+                                                        onComplete = { success, error ->
+                                                            if (!success) {
+                                                                // Handle error if needed
+                                                            }
+                                                        }
+                                                    )
+                                                },
+                                                leadingIcon = {
+                                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                             
@@ -183,6 +270,7 @@ fun GroupProfileScreen(
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
                                 
+                                // Adicionar membros
                                 Button(
                                     onClick = { showAddMembersDialog = true },
                                     modifier = Modifier.fillMaxWidth(),
@@ -191,6 +279,23 @@ fun GroupProfileScreen(
                                     Icon(Icons.Default.Add, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("Adicionar Membros")
+                                }
+                                
+                                // Deletar grupo (apenas para o criador)
+                                if (g.createdBy == currentUser?.uid) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    OutlinedButton(
+                                        onClick = { showDeleteConfirmation = true },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = Color.Red
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Deletar Grupo")
+                                    }
                                 }
                             }
                         }
@@ -248,20 +353,10 @@ fun GroupProfileScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Avatar do membro
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(Blue.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Blue
-                                )
-                            }
+                            DefaultAvatar(
+                                size = 48.dp,
+                                backgroundColor = Color(0xFFF5F5F5)
+                            )
                             
                             Spacer(modifier = Modifier.width(12.dp))
                             
@@ -355,6 +450,35 @@ fun GroupProfileScreen(
                     // Handle result if needed
                 }
                 showEditDialog = false
+            }
+        )
+    }
+    
+    // Dialog para confirmar exclusão do grupo
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Deletar Grupo") },
+            text = { Text("Tem certeza que deseja deletar este grupo? Esta ação não pode ser desfeita.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteGroup(groupId) { success, message ->
+                            if (success) {
+                                navController.popBackStack()
+                            }
+                        }
+                        showDeleteConfirmation = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Deletar", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("Cancelar")
+                }
             }
         )
     }

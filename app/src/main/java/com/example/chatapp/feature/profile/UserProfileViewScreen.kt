@@ -48,6 +48,7 @@ import coil.compose.AsyncImage
 import com.example.chatapp.R
 import com.example.chatapp.model.UserProfile
 import com.example.chatapp.model.UserStatus
+import com.example.chatapp.ui.component.DefaultAvatar
 import com.example.chatapp.ui.theme.Blue
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -98,7 +99,7 @@ fun UserProfileViewScreen(navController: NavController, userId: String) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Foto do perfil
-            if (userProfile?.profileImageUrl != null) {
+            if (userProfile?.profileImageUrl != null && userProfile?.profileImageUrl!!.isNotEmpty()) {
                 AsyncImage(
                     model = userProfile?.profileImageUrl,
                     contentDescription = "Foto do perfil",
@@ -109,15 +110,9 @@ fun UserProfileViewScreen(navController: NavController, userId: String) {
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_person),
-                    contentDescription = "Foto do perfil",
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .border(2.dp, Blue, CircleShape)
-                        .background(Color.LightGray, CircleShape),
-                    contentScale = ContentScale.Crop
+                DefaultAvatar(
+                    size = 120.dp,
+                    backgroundColor = Color(0xFFF5F5F5)
                 )
             }
 

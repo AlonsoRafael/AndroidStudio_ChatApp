@@ -67,6 +67,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.chatapp.R
 import com.example.chatapp.model.UserStatus
+import com.example.chatapp.ui.component.DefaultAvatar
 import com.example.chatapp.ui.theme.Blue
 import com.google.firebase.auth.FirebaseAuth
 
@@ -126,7 +127,7 @@ fun ProfileScreen(navController: NavController) {
             Box(
                 contentAlignment = Alignment.BottomEnd
             ) {
-                if (userProfile?.profileImageUrl != null) {
+                if (userProfile?.profileImageUrl != null && userProfile?.profileImageUrl!!.isNotEmpty()) {
                     AsyncImage(
                         model = userProfile?.profileImageUrl,
                         contentDescription = "Foto do perfil",
@@ -137,15 +138,9 @@ fun ProfileScreen(navController: NavController) {
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_person),
-                        contentDescription = "Foto do perfil",
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, Blue, CircleShape)
-                            .background(Color.LightGray, CircleShape),
-                        contentScale = ContentScale.Crop
+                    DefaultAvatar(
+                        size = 120.dp,
+                        backgroundColor = Color(0xFFF5F5F5)
                     )
                 }
                 

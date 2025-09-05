@@ -93,6 +93,7 @@ import com.example.chatapp.ui.components.VideoPlayer
 import com.example.chatapp.ui.components.FileAttachment
 import com.example.chatapp.ui.components.EmojiPicker
 import com.example.chatapp.ui.component.UserAvatarWithStatus
+import com.example.chatapp.ui.component.DefaultAvatar
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.zegocloud.uikit.prebuilt.call.invite.widget.ZegoSendCallInvitationButton
@@ -180,6 +181,9 @@ fun ChatScreen(navController: NavController, channelId: String, channelName: Str
         ) {
             LaunchedEffect(key1 = true) {
                 viewModel.listenForMessages(channelId)
+                if (isGroup) {
+                    viewModel.loadGroupData(channelId)
+                }
             }
             
             val messages = viewModel.message.collectAsState()
@@ -260,6 +264,7 @@ fun ModernChatTopBar(
 ) {
     val isSearchActive = viewModel.isSearchActive.collectAsState()
     val searchQuery = viewModel.searchQuery.collectAsState()
+    val currentGroup = viewModel.currentGroup.collectAsState()
     
     if (isSearchActive.value) {
         // Barra de busca ativa
@@ -354,19 +359,22 @@ fun ModernChatTopBar(
                             }
                         }
                     } else {
-                        // Para grupo, manter o avatar simples
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF0055FF)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = channelName.removePrefix("Chat com ").firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                color = Color.White,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                        // Para grupo, mostrar foto real do grupo
+                        val group = currentGroup.value
+                        if (group?.imageUrl != null && group.imageUrl.isNotEmpty()) {
+                            AsyncImage(
+                                model = group.imageUrl,
+                                contentDescription = "Foto do grupo",
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            // Fallback para avatar com logo
+                            DefaultAvatar(
+                                size = 40.dp,
+                                backgroundColor = Color(0xFFF5F5F5)
                             )
                         }
                     }

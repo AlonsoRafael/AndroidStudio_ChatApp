@@ -36,6 +36,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.chatapp.R
 import com.example.chatapp.model.Contact
+import com.example.chatapp.ui.component.DefaultAvatar
 import com.example.chatapp.ui.theme.Blue
 import java.text.SimpleDateFormat
 import java.util.*
@@ -119,15 +120,21 @@ fun GroupItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Group image
-            AsyncImage(
-                model = group.imageUrl ?: R.drawable.logo,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(50.dp)
-                    .clip(CircleShape)
-                    .background(Blue),
-                contentScale = ContentScale.Crop
-            )
+            if (group.imageUrl != null && group.imageUrl.isNotEmpty()) {
+                AsyncImage(
+                    model = group.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                DefaultAvatar(
+                    size = 50.dp,
+                    backgroundColor = Color(0xFFF5F5F5)
+                )
+            }
 
             Spacer(modifier = Modifier.width(16.dp))
 
@@ -176,11 +183,9 @@ fun EmptyGroupsState(onCreateGroup: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            Icons.Default.Person,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = Color.Gray
+        DefaultAvatar(
+            size = 80.dp,
+            backgroundColor = Color(0xFFF5F5F5)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -260,10 +265,9 @@ fun CreateGroupDialog(
                                 contentScale = ContentScale.Crop
                             )
                         } else {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Adicionar imagem",
-                                tint = Color.Gray
+                            DefaultAvatar(
+                                size = 80.dp,
+                                backgroundColor = Color(0xFFF5F5F5)
                             )
                         }
                     }
@@ -368,14 +372,21 @@ fun ContactSelectionItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Avatar
-        AsyncImage(
-            model = contact.profileImageUrl ?: R.drawable.logo,
-            contentDescription = null,
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Crop
-        )
+        if (contact.profileImageUrl != null && contact.profileImageUrl.isNotEmpty()) {
+            AsyncImage(
+                model = contact.profileImageUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            DefaultAvatar(
+                size = 40.dp,
+                backgroundColor = Color(0xFFF5F5F5)
+            )
+        }
 
         Spacer(modifier = Modifier.width(12.dp))
 

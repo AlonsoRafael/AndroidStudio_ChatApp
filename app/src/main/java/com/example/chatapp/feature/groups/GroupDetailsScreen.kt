@@ -34,6 +34,7 @@ import coil.compose.AsyncImage
 import com.example.chatapp.R
 import com.example.chatapp.model.Contact
 import com.example.chatapp.model.Group
+import com.example.chatapp.ui.component.DefaultAvatar
 import com.example.chatapp.ui.theme.Blue
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -83,8 +84,13 @@ fun GroupDetailsScreen(
                 },
                 actions = {
                     group?.let { g ->
-                        // Only show edit if user is admin
-                        if (g.admins.contains(currentUser?.uid)) {
+                        // Debug logs
+                        android.util.Log.d("GroupDetails", "Current user ID: ${currentUser?.uid}")
+                        android.util.Log.d("GroupDetails", "Group createdBy: ${g.createdBy}")
+                        android.util.Log.d("GroupDetails", "Is creator: ${g.createdBy == currentUser?.uid}")
+                        
+                        // Show edit button for any group member
+                        if (g.participants.containsKey(currentUser?.uid)) {
                             IconButton(onClick = { showEditDialog = true }) {
                                 Icon(Icons.Default.Edit, contentDescription = "Editar")
                             }
@@ -112,15 +118,21 @@ fun GroupDetailsScreen(
                             modifier = Modifier.padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            AsyncImage(
-                                model = g.imageUrl ?: R.drawable.logo,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .clip(CircleShape)
-                                    .background(Blue),
-                                contentScale = ContentScale.Crop
-                            )
+                            if (g.imageUrl != null && g.imageUrl.isNotEmpty()) {
+                                AsyncImage(
+                                    model = g.imageUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(100.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                DefaultAvatar(
+                                    size = 100.dp,
+                                    backgroundColor = Color(0xFFF5F5F5)
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(16.dp))
 
@@ -179,7 +191,10 @@ fun GroupDetailsScreen(
                         }
 
                         // Delete group (only for creator)
+                        android.util.Log.d("GroupDetails", "Checking delete permissions - Is creator: ${g.createdBy == currentUser?.uid}")
+                        
                         if (g.createdBy == currentUser?.uid) {
+                            android.util.Log.d("GroupDetails", "Showing delete button")
                             OutlinedButton(
                                 onClick = { showDeleteConfirmation = true },
                                 modifier = Modifier.weight(1f),
@@ -191,6 +206,8 @@ fun GroupDetailsScreen(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Deletar")
                             }
+                        } else {
+                            android.util.Log.d("GroupDetails", "NOT showing delete button - not creator")
                         }
                     }
                 }
@@ -440,23 +457,71 @@ fun EditGroupDialog(
         title = { Text("Editar Grupo") },
         text = {
             Column {
-                // Group image
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.Gray.copy(alpha = 0.3f))
-                        .clickable { imagePickerLauncher.launch("image/*") },
-                    contentAlignment = Alignment.Center
+                // Group image with options
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    AsyncImage(
-                        model = imageUri ?: group.imageUrl ?: R.drawable.logo,
-                        contentDescription = null,
+                    Box(
                         modifier = Modifier
                             .size(80.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
+                            .clip(CircleShape)
+                            .background(Color.Gray.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = when {
+                                imageUri == Uri.EMPTY -> R.drawable.logo // Showing removal preview
+                                imageUri != null -> imageUri // New image selected
+                                else -> group.imageUrl ?: R.drawable.logo // Current or default
+                            },
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Photo options (any group member can edit)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Change photo button
+                        OutlinedButton(
+                            onClick = { imagePickerLauncher.launch("image/*") },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Alterar", fontSize = 12.sp)
+                        }
+                        
+                        // Remove photo button (only if there's a custom photo or new image selected)
+                        if ((group.imageUrl != null && group.imageUrl!!.isNotEmpty()) || 
+                            (imageUri != null && imageUri != Uri.EMPTY)) {
+                            OutlinedButton(
+                                onClick = { imageUri = Uri.EMPTY }, // This will signal removal
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Remover", fontSize = 12.sp)
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

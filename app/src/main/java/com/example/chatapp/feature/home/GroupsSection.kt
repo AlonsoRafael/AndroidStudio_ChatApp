@@ -20,6 +20,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.chatapp.R
 import com.example.chatapp.model.Group
+import com.example.chatapp.ui.component.DefaultAvatar
 import com.example.chatapp.ui.theme.Blue
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -124,15 +125,21 @@ fun GroupListItem(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = group.imageUrl ?: R.drawable.logo,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Blue),
-                contentScale = ContentScale.Crop
-            )
+            if (group.imageUrl != null && group.imageUrl.isNotEmpty()) {
+                AsyncImage(
+                    model = group.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                DefaultAvatar(
+                    size = 48.dp,
+                    backgroundColor = Color(0xFFF5F5F5)
+                )
+            }
             
             Spacer(modifier = Modifier.width(12.dp))
             

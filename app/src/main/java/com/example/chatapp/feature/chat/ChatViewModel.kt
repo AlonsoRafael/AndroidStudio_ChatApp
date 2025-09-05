@@ -12,6 +12,7 @@ import com.example.chatapp.R
 import com.example.chatapp.SupabaseStorageUtils
 import com.example.chatapp.FileInfo
 import com.example.chatapp.model.Channel
+import com.example.chatapp.model.Group
 import com.example.chatapp.model.Message
 import com.example.chatapp.model.MessageStatus
 import com.example.chatapp.model.MessageType
@@ -48,6 +49,10 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
     
     private val _isSearchActive = MutableStateFlow(false)
     val isSearchActive = _isSearchActive.asStateFlow()
+    
+    private val _currentGroup = MutableStateFlow<Group?>(null)
+    val currentGroup = _currentGroup.asStateFlow()
+    
     private val db = Firebase.database
 
     fun sendMessage(channelID: String, messageText: String?, image: String? = null, messageType: MessageType = MessageType.TEXT) {
@@ -766,6 +771,20 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
                 markMessageAsRead(channelID, message.id)
             }
         }
+    }
+    
+    fun loadGroupData(groupId: String) {
+        db.reference.child("groups").child(groupId)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val group = snapshot.getValue(Group::class.java)?.copy(id = groupId)
+                    _currentGroup.value = group
+                }
+                
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("ChatViewModel", "Erro ao carregar grupo: ${error.message}")
+                }
+            })
     }
 
 }

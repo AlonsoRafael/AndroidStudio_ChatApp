@@ -61,7 +61,7 @@ fun UserAvatarWithStatus(
     ) {
         Box {
             // Avatar
-            if (userProfile?.profileImageUrl != null) {
+            if (userProfile?.profileImageUrl != null && userProfile?.profileImageUrl!!.isNotEmpty()) {
                 AsyncImage(
                     model = userProfile?.profileImageUrl,
                     contentDescription = "Avatar",
@@ -72,20 +72,10 @@ fun UserAvatarWithStatus(
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Box(
-                    modifier = Modifier
-                        .size(size.dp)
-                        .clip(CircleShape)
-                        .background(Color.LightGray),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = userName.firstOrNull()?.toString()?.uppercase() ?: "?",
-                        color = Color.White,
-                        fontSize = (size / 2).sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                DefaultAvatar(
+                    size = size.dp,
+                    backgroundColor = Color(0xFFF5F5F5)
+                )
             }
             
             // Status indicator
