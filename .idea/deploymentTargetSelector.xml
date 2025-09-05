@@ -21,12 +21,12 @@
           <targets>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\rafael\.android\avd\Medium_Phone.avd" />
+                <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\rafael\.android\avd\Pixel_5.avd" />
               </handle>
             </Target>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\rafael\.android\avd\Pixel_9.avd" />
+                <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\rafael\.android\avd\Pixel_6.avd" />
               </handle>
             </Target>
           </targets>

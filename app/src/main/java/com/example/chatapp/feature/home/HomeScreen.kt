@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.activity.compose.LocalActivity
@@ -28,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +45,7 @@ import androidx.navigation.NavController
 import com.example.chatapp.AppID
 import com.example.chatapp.AppSign
 import com.example.chatapp.MainActivity
+import com.example.chatapp.R
 import com.example.chatapp.feature.chat.CallButton
 import com.example.chatapp.ui.theme.Blue
 import com.example.chatapp.ui.theme.ContactGrey
@@ -80,7 +81,10 @@ fun HomeScreen(navController: NavController) {
                         Icon(Icons.Default.Person, contentDescription = "Contatos")
                     }
                     IconButton(onClick = { navController.navigate("groups") }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Grupos")
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_chat),
+                            contentDescription = "Grupos"
+                        )
                     }
                     IconButton(onClick = { navController.navigate("profile") }) {
                         Icon(Icons.Default.AccountCircle, contentDescription = "Perfil")
