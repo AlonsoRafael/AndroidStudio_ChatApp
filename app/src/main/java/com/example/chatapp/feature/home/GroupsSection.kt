@@ -3,11 +3,8 @@ package com.example.chatapp.feature.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -65,54 +62,40 @@ fun GroupsSection(navController: NavController, searchQuery: String = "") {
         groups.take(5) // Mostrar apenas 5 grupos quando não há busca
     } else {
         groups.filter { group ->
-            group.name.contains(searchQuery, ignoreCase = true)
+            group.name.contains(searchQuery, ignoreCase = true) ||
+            group.lastMessage.contains(searchQuery, ignoreCase = true) ||
+            group.lastMessageSender.contains(searchQuery, ignoreCase = true)
         } // Mostrar todos os resultados filtrados quando há busca
     }
 
     if (filteredGroups.isNotEmpty()) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Seus Grupos",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Gray
-                )
-                Text(
-                    text = "Ver todos",
-                    fontSize = 14.sp,
-                    color = Blue,
-                    modifier = Modifier.clickable {
-                        navController.navigate("groups")
+            Text(
+                text = "Grupos",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // Exibir grupos em formato de lista (comprido)
+            filteredGroups.forEach { group ->
+                GroupListItem(
+                    group = group,
+                    onClick = {
+                        navController.navigate("group-chat/${group.id}&${group.name}")
                     }
                 )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(filteredGroups) { group ->
-                    GroupCard(
-                        group = group,
-                        onClick = {
-                            navController.navigate("group-chat/${group.id}&${group.name}")
-                        }
-                    )
-                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     } else if (searchQuery.isNotEmpty()) {
         // Mostrar mensagem quando há busca ativa mas nenhum grupo encontrado
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             Text(
                 text = "Nenhum grupo encontrado para \"$searchQuery\"",
@@ -125,49 +108,71 @@ fun GroupsSection(navController: NavController, searchQuery: String = "") {
 }
 
 @Composable
-fun GroupCard(
+fun GroupListItem(
     group: Group,
     onClick: () -> Unit
 ) {
-    Card(
+    Box(
         modifier = Modifier
-            .width(140.dp)
-            .height(100.dp)
-            .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(com.example.chatapp.ui.theme.LightGrey)
+            .clickable { onClick() }
+            .padding(12.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
                 model = group.imageUrl ?: R.drawable.logo,
                 contentDescription = null,
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(Blue),
                 contentScale = ContentScale.Crop
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = group.name,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Text(
-                text = "${group.participants.size} membros",
-                fontSize = 10.sp,
-                color = Color.Gray
-            )
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = group.name,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.Black
+                )
+                
+                if (group.lastMessage.isNotEmpty() && group.lastMessageSender.isNotEmpty()) {
+                    Text(
+                        text = "${group.lastMessageSender}: ${group.lastMessage}",
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else {
+                    Text(
+                        text = "${group.participants.size} participantes",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+            
+            // Mostrar horário da última mensagem se existir
+            if (group.lastMessageTime > 0) {
+                Text(
+                    text = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                        .format(java.util.Date(group.lastMessageTime)),
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
         }
     }
 }

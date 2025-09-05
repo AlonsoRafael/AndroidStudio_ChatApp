@@ -10,6 +10,7 @@ data class Group(
     val participants: Map<String, String> = emptyMap(), // userId -> userName
     val admins: List<String> = emptyList(), // Lista de IDs dos administradores
     val lastMessage: String = "",
+    val lastMessageSender: String = "", // Nome de quem enviou a última mensagem
     val lastMessageTime: Long = 0L
 )
 

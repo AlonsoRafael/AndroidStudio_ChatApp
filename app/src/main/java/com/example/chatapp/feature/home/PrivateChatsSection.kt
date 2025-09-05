@@ -38,6 +38,9 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.database
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class PrivateChat(
     val id: String = "",
@@ -123,6 +126,7 @@ fun PrivateChatsSection(navController: NavController, searchQuery: String = "") 
                     otherUserName = otherUserName,
                     otherUserProfile = otherUserProfile,
                     lastMessage = chat.lastMessage,
+                    lastMessageTime = chat.lastMessageTime,
                     onClick = {
                         navController.navigate("chat/${chat.id}&Chat com $otherUserName")
                     }
@@ -153,6 +157,7 @@ fun PrivateChatItem(
     otherUserName: String,
     otherUserProfile: UserProfile?,
     lastMessage: String,
+    lastMessageTime: Long,
     onClick: () -> Unit
 ) {
     Box(
@@ -201,6 +206,16 @@ fun PrivateChatItem(
                         color = Color.Gray
                     )
                 }
+            }
+            
+            // Mostrar horário da última mensagem se existir
+            if (lastMessageTime > 0) {
+                Text(
+                    text = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                        .format(java.util.Date(lastMessageTime)),
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
             }
         }
     }

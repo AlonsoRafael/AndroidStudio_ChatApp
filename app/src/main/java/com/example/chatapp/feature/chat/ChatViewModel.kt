@@ -91,6 +91,8 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
                                 
                                 if (!isPrivateChat(channelID)) {
                                     postNotificationToUsers(channelID, message.senderName, messageText ?: getMessageTypeDescription(messageType))
+                                    // Atualizar última mensagem do grupo
+                                    updateGroupLastMessage(channelID, messageText ?: getMessageTypeDescription(messageType), message.senderName)
                                 } else {
                                     // Para chats privados, notificar apenas o outro usuário
                                     postNotificationToPrivateChat(channelID, message.senderName, messageText ?: getMessageTypeDescription(messageType))
@@ -210,7 +212,7 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
                     val dbPath = if (isPrivate) {
                         "private_messages/$channelID/$messageId"
                     } else {
-                        "channels/$channelID/messages/$messageId"
+                        "messages/$channelID/$messageId"
                     }
                     
                     Log.d("ChatViewModel", "Salvando sticker no Firebase path: $dbPath (isPrivate: $isPrivate)")
@@ -218,7 +220,7 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
                     val dbRef = if (isPrivate) {
                         db.reference.child("private_messages").child(channelID).child(messageId)
                     } else {
-                        db.reference.child("channels").child(channelID).child("messages").child(messageId)
+                        db.reference.child("messages").child(channelID).child(messageId)
                     }
                     
                     dbRef.setValue(message)
@@ -238,6 +240,8 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
                             // Atualizar notificações e última mensagem
                             if (!isPrivate) {
                                 postNotificationToUsers(channelID, message.senderName, getMessageTypeDescription(MessageType.STICKER))
+                                // Atualizar última mensagem do grupo
+                                updateGroupLastMessage(channelID, getMessageTypeDescription(MessageType.STICKER), message.senderName)
                             } else {
                                 // Para chats privados, notificar apenas o outro usuário
                                 postNotificationToPrivateChat(channelID, message.senderName, getMessageTypeDescription(MessageType.STICKER))
@@ -300,6 +304,8 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
                             // Atualizar notificações e última mensagem
                             if (!isPrivateChat(channelID)) {
                                 postNotificationToUsers(channelID, message.senderName, getMessageTypeDescription(MessageType.VIDEO))
+                                // Atualizar última mensagem do grupo
+                                updateGroupLastMessage(channelID, getMessageTypeDescription(MessageType.VIDEO), message.senderName)
                             } else {
                                 // Para chats privados, notificar apenas o outro usuário
                                 postNotificationToPrivateChat(channelID, message.senderName, getMessageTypeDescription(MessageType.VIDEO))
@@ -361,6 +367,8 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
                             // Atualizar notificações e última mensagem
                             if (!isPrivateChat(channelID)) {
                                 postNotificationToUsers(channelID, message.senderName, getMessageTypeDescription(MessageType.AUDIO))
+                                // Atualizar última mensagem do grupo
+                                updateGroupLastMessage(channelID, getMessageTypeDescription(MessageType.AUDIO), message.senderName)
                             } else {
                                 // Para chats privados, notificar apenas o outro usuário
                                 postNotificationToPrivateChat(channelID, message.senderName, getMessageTypeDescription(MessageType.AUDIO))
@@ -419,6 +427,8 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
                             // Atualizar notificações e última mensagem
                             if (!isPrivateChat(channelID)) {
                                 postNotificationToUsers(channelID, message.senderName, getMessageTypeDescription(MessageType.FILE))
+                                // Atualizar última mensagem do grupo
+                                updateGroupLastMessage(channelID, getMessageTypeDescription(MessageType.FILE), message.senderName)
                             } else {
                                 // Para chats privados, notificar apenas o outro usuário
                                 postNotificationToPrivateChat(channelID, message.senderName, getMessageTypeDescription(MessageType.FILE))
@@ -454,9 +464,9 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
             Log.d("ChatViewModel", "📋 Carregando mensagens PRIVADAS de: $path")
             db.getReference("private_messages").child(channelID).orderByChild("createdAt")
         } else {
-            val path = "channels/$channelID/messages"
-            Log.d("ChatViewModel", "📋 Carregando mensagens PÚBLICAS de: $path")
-            db.getReference("channels").child(channelID).child("messages").orderByChild("createdAt")
+            val path = "messages/$channelID"
+            Log.d("ChatViewModel", "📋 Carregando mensagens de GRUPO de: $path")
+            db.getReference("messages").child(channelID).orderByChild("createdAt")
         }
         
         messagesRef.addValueEventListener(object : ValueEventListener {
@@ -624,6 +634,16 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
         )
         
         db.reference.child("private_chats").child(channelID).updateChildren(updates)
+    }
+
+    private fun updateGroupLastMessage(channelID: String, message: String, senderName: String) {
+        val updates = mapOf(
+            "lastMessage" to message,
+            "lastMessageSender" to senderName,
+            "lastMessageTime" to System.currentTimeMillis()
+        )
+        
+        db.reference.child("groups").child(channelID).updateChildren(updates)
     }
 
     fun getOtherUserIdFromPrivateChat(channelID: String): String? {
