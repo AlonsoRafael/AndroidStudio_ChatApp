@@ -25,9 +25,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.example.chatapp.R
 import kotlinx.coroutines.delay
 import java.io.File
 import java.io.IOException
@@ -149,7 +151,7 @@ fun AudioRecorder(
                             .background(Color.Red, CircleShape)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Home,
+                            painter = painterResource(id = R.drawable.ic_pause),
                             contentDescription = "Parar gravação",
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)

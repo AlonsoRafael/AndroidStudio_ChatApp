@@ -13,7 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.chatapp.R
 import kotlinx.coroutines.delay
 import java.io.IOException
 
@@ -94,11 +96,19 @@ fun AudioPlayer(
                 .size(40.dp)
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
         ) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Default.Favorite else Icons.Default.PlayArrow,
-                contentDescription = if (isPlaying) "Pausar" else "Reproduzir",
-                tint = Color.White
-            )
+            if (isPlaying) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_pause),
+                    contentDescription = "Pausar",
+                    tint = Color.White
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Reproduzir",
+                    tint = Color.White
+                )
+            }
         }
         
         // Barra de progresso

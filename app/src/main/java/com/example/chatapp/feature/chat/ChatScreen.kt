@@ -1,11 +1,15 @@
 package com.example.chatapp.feature.chat
 
 import android.Manifest
+import android.content.Context
+import android.media.MediaRecorder
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,11 +19,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,33 +36,43 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -65,7 +80,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.chatapp.R
-import com.example.chatapp.feature.home.ChannelItem
 import com.example.chatapp.model.Message
 import com.example.chatapp.model.MessageType
 import com.example.chatapp.ui.theme.Blue
@@ -78,84 +92,98 @@ import com.example.chatapp.ui.components.AudioPlayer
 import com.example.chatapp.ui.components.VideoPlayer
 import com.example.chatapp.ui.components.FileAttachment
 import com.example.chatapp.ui.components.EmojiPicker
+import com.example.chatapp.ui.component.UserAvatarWithStatus
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.zegocloud.uikit.prebuilt.call.invite.widget.ZegoSendCallInvitationButton
 import com.zegocloud.uikit.service.defines.ZegoUIKitUser
-import org.jetbrains.annotations.Async
+import kotlinx.coroutines.delay
 import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(navController: NavController, channelId: String, channelName: String, isGroup: Boolean = false) {
+    val viewModel: ChatViewModel = hiltViewModel()
+    val attachmentDialog = remember { mutableStateOf(false) }
+    val emojiPickerVisible = remember { mutableStateOf(false) }
+    val cameraImageUri = remember { mutableStateOf<Uri?>(null) }
+    
+    // Launchers para diferentes tipos de mídia
+    val cameraImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            cameraImageUri.value?.let {
+                viewModel.sendImageMessage(it, channelId)
+            }
+        }
+    }
+
+    val imageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.sendImageMessage(it, channelId) }
+    }
+
+    val videoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.sendVideoMessage(it, channelId) }
+    }
+
+    val fileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.sendFileMessage(it, channelId) }
+    }
+
+    fun createImageUri(): Uri {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir = ContextCompat.getExternalFilesDirs(
+            navController.context, Environment.DIRECTORY_PICTURES
+        ).first()
+        return FileProvider.getUriForFile(navController.context,
+            "${navController.context.packageName}.provider",
+            File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir).apply {
+                cameraImageUri.value = Uri.fromFile(this)
+            })
+    }
+
+    val permissionLauncher =
+        rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                cameraImageLauncher.launch(createImageUri())
+            }
+        }
+
     Scaffold(
+        topBar = {
+            ModernChatTopBar(
+                channelName = channelName,
+                channelId = channelId,
+                isGroup = isGroup,
+                viewModel = viewModel,
+                navController = navController,
+                onBackClick = { navController.navigateUp() }
+            )
+        },
         containerColor = Color.White
-    ) {
-        val viewModel: ChatViewModel = hiltViewModel()
-        val attachmentDialog = remember { mutableStateOf(false) }
-        val emojiPickerVisible = remember { mutableStateOf(false) }
-
-        val cameraImageUri = remember { mutableStateOf<Uri?>(null) }
-
-        // Launchers para diferentes tipos de mídia
-        val cameraImageLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.TakePicture()
-        ) { success ->
-            if (success) {
-                cameraImageUri.value?.let {
-                    viewModel.sendImageMessage(it, channelId)
-                }
-            }
-        }
-
-        val imageLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.GetContent()
-        ) { uri: Uri? ->
-            uri?.let { viewModel.sendImageMessage(it, channelId) }
-        }
-
-        val videoLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.GetContent()
-        ) { uri: Uri? ->
-            uri?.let { viewModel.sendVideoMessage(it, channelId) }
-        }
-
-        val fileLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.GetContent()
-        ) { uri: Uri? ->
-            uri?.let { viewModel.sendFileMessage(it, channelId) }
-        }
-
-        fun createImageUri(): Uri {
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val storageDir = ContextCompat.getExternalFilesDirs(
-                navController.context, Environment.DIRECTORY_PICTURES
-            ).first()
-            return FileProvider.getUriForFile(navController.context,
-                "${navController.context.packageName}.provider",
-                File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir).apply {
-                    cameraImageUri.value = Uri.fromFile(this)
-                })
-        }
-
-        val permissionLauncher =
-            rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { isGranted ->
-                if (isGranted) {
-                    cameraImageLauncher.launch(createImageUri())
-                }
-            }
-
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(it)
+                .padding(paddingValues)
         ) {
             LaunchedEffect(key1 = true) {
                 viewModel.listenForMessages(channelId)
             }
+            
             val messages = viewModel.message.collectAsState()
+            
             ChatMessages(
                 messages = messages.value,
                 onSendMessage = { message ->
@@ -170,11 +198,8 @@ fun ChatScreen(navController: NavController, channelId: String, channelName: Str
                 onAudioRecorded = { audioUri, duration ->
                     viewModel.sendAudioMessage(audioUri, channelId, duration)
                 },
-                channelName = channelName,
                 viewModel = viewModel,
-                channelID = channelId,
-                navController = navController,
-                isGroup = isGroup
+                navController = navController
             )
         }
 
@@ -223,6 +248,206 @@ fun ChatScreen(navController: NavController, channelId: String, channelName: Str
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ModernChatTopBar(
+    channelName: String,
+    channelId: String,
+    isGroup: Boolean,
+    viewModel: ChatViewModel,
+    navController: NavController,
+    onBackClick: () -> Unit
+) {
+    val isSearchActive = viewModel.isSearchActive.collectAsState()
+    val searchQuery = viewModel.searchQuery.collectAsState()
+    
+    if (isSearchActive.value) {
+        // Barra de busca ativa
+        TopAppBar(
+            title = {
+                TextField(
+                    value = searchQuery.value,
+                    onValueChange = { viewModel.updateSearchQuery(it) },
+                    placeholder = { Text("Buscar mensagens...") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Buscar"
+                        )
+                    },
+                    trailingIcon = if (searchQuery.value.isNotEmpty()) {
+                        {
+                            IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Limpar"
+                                )
+                            }
+                        }
+                    } else null,
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = { viewModel.toggleSearch() }) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = "Fechar busca"
+                    )
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                actionIconContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+    } else {
+        // TopBar normal
+        TopAppBar(
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        if (isGroup) {
+                            navController.navigate("group-profile/$channelId")
+                        } else if (viewModel.isPrivateChatPublic(channelId)) {
+                            viewModel.getOtherUserIdFromPrivateChat(channelId)?.let { otherUserId ->
+                                navController.navigate("user-profile/$otherUserId")
+                            }
+                        }
+                    }
+                ) {
+                    // Avatar do canal/usuário
+                    if (!isGroup) {
+                        // Para chat privado, mostrar avatar do outro usuário
+                        viewModel.getOtherUserIdFromPrivateChat(channelId)?.let { otherUserId ->
+                            UserAvatarWithStatus(
+                                userId = otherUserId,
+                                userName = channelName.removePrefix("Chat com "),
+                                showName = false,
+                                size = 40
+                            )
+                        } ?: run {
+                            // Fallback se não conseguir obter o ID do usuário
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF0055FF)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = channelName.removePrefix("Chat com ").firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    } else {
+                        // Para grupo, manter o avatar simples
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF0055FF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = channelName.removePrefix("Chat com ").firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column {
+                        Text(
+                            text = channelName.removePrefix("Chat com "),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (isGroup) {
+                            Text(
+                                text = "Grupo",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+            },
+            navigationIcon = {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Voltar",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            actions = {
+                // Botão de busca
+                IconButton(onClick = { viewModel.toggleSearch() }) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Buscar mensagens",
+                        tint = Color(0xFF0055FF)
+                    )
+                }
+                
+                // Botão de chamada de voz
+                CallButton(isVideoCall = false) { callButton ->
+                    viewModel.getAllUserEmails(channelId) { emails ->
+                        val list: MutableList<ZegoUIKitUser> = mutableListOf()
+                        emails.forEach { email ->
+                            Firebase.auth.currentUser?.email?.let { currentEmail ->
+                                if (email != currentEmail) {
+                                    list.add(ZegoUIKitUser(email, email))
+                                }
+                            }
+                        }
+                        callButton.setInvitees(list)
+                    }
+                }
+                
+                // Botão de videochamada
+                CallButton(isVideoCall = true) { callButton ->
+                    viewModel.getAllUserEmails(channelId) { emails ->
+                        val list: MutableList<ZegoUIKitUser> = mutableListOf()
+                        emails.forEach { email ->
+                            Firebase.auth.currentUser?.email?.let { currentEmail ->
+                                if (email != currentEmail) {
+                                    list.add(ZegoUIKitUser(email, email))
+                                }
+                            }
+                        }
+                        callButton.setInvitees(list)
+                    }
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                actionIconContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+    }
+}
 
 @Composable
 fun AttachmentSelectionDialog(
@@ -247,9 +472,10 @@ fun AttachmentSelectionDialog(
                         modifier = Modifier.clickable { onCameraSelected() }
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.attach),
+                            painter = painterResource(id = R.drawable.ic_camera),
                             contentDescription = "Câmera",
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(48.dp),
+                            tint = Color(0xFF0055FF)
                         )
                         Text("Câmera", fontSize = MaterialTheme.typography.bodySmall.fontSize)
                     }
@@ -260,9 +486,10 @@ fun AttachmentSelectionDialog(
                         modifier = Modifier.clickable { onGallerySelected() }
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.attach),
+                            painter = painterResource(id = R.drawable.ic_image),
                             contentDescription = "Galeria",
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(48.dp),
+                            tint = Color(0xFF0055FF)
                         )
                         Text("Galeria", fontSize = MaterialTheme.typography.bodySmall.fontSize)
                     }
@@ -282,7 +509,8 @@ fun AttachmentSelectionDialog(
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = "Vídeo",
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(48.dp),
+                            tint = Color(0xFF0055FF)
                         )
                         Text("Vídeo", fontSize = MaterialTheme.typography.bodySmall.fontSize)
                     }
@@ -293,9 +521,10 @@ fun AttachmentSelectionDialog(
                         modifier = Modifier.clickable { onFileSelected() }
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Add,
+                            painter = painterResource(id = R.drawable.attach),
                             contentDescription = "Arquivo",
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(48.dp),
+                            tint = Color(0xFF0055FF)
                         )
                         Text("Arquivo", fontSize = MaterialTheme.typography.bodySmall.fontSize)
                     }
@@ -312,23 +541,17 @@ fun AttachmentSelectionDialog(
 
 @Composable
 fun ChatMessages(
-    channelName: String,
-    channelID: String,
     messages: List<Message>,
     onSendMessage: (String) -> Unit,
     onAttachmentClicked: () -> Unit,
     onEmojiClicked: () -> Unit,
     onAudioRecorded: (Uri, Long?) -> Unit,
     viewModel: ChatViewModel,
-    navController: NavController,
-    isGroup: Boolean = false
+    navController: NavController
 ) {
     val hideKeyboardController = LocalSoftwareKeyboardController.current
     val lazyListState = remember { LazyListState() }
-    
-    val msg = remember {
-        mutableStateOf("")
-    }
+    val msg = remember { mutableStateOf("") }
     
     // Scroll automático para a última mensagem quando novas mensagens chegarem
     LaunchedEffect(messages.size) {
@@ -338,69 +561,12 @@ fun ChatMessages(
     }
     
     Column(modifier = Modifier.fillMaxSize()) {
-        // TOP BAR FIXA - Sempre visível no topo
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-        ) {
-            ChannelItem(
-                channelName = channelName, 
-                Modifier, 
-                true, 
-                onClick = {},
-                onCall = { callButton->
-                    viewModel.getAllUserEmails(channelID) {
-                        val list: MutableList<ZegoUIKitUser> = mutableListOf()
-                        it.forEach { email ->
-                            Firebase.auth.currentUser?.email?.let { em ->
-                                if(email != em){
-                                    list.add(
-                                        ZegoUIKitUser(
-                                            email, email
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                        callButton.setInvitees(list)
-                    }
-                },
-                onProfileClick = if (isGroup) {
-                    {
-                        // Para grupos, navegar para o perfil do grupo
-                        Log.d("ChatScreen", "Clique no perfil do grupo! ChannelID: $channelID")
-                        navController.navigate("group-profile/$channelID")
-                    }
-                } else if (viewModel.isPrivateChatPublic(channelID)) {
-                    {
-                        // Para chats privados, navegar para o perfil do outro usuário
-                        Log.d("ChatScreen", "Clique na topbar! ChannelID: $channelID")
-                        viewModel.getOtherUserIdFromPrivateChat(channelID)?.let { otherUserId ->
-                            Log.d("ChatScreen", "Navegando para perfil do usuário: $otherUserId")
-                            navController.navigate("user-profile/$otherUserId")
-                        }
-                    }
-                } else null // Para chats de canal público, não navegar para perfil
-            )
-        }
-        
-        // Barra de busca (condicional) - também fixa
-        val isSearchActive = viewModel.isSearchActive.collectAsState()
-        val searchQuery = viewModel.searchQuery.collectAsState()
-        
-        if (isSearchActive.value) {
-            SearchBar(
-                query = searchQuery.value,
-                onQueryChange = { viewModel.updateSearchQuery(it) },
-                onClose = { viewModel.toggleSearch() }
-            )
-        }
-
         // MENSAGENS - Área rolável
         LazyColumn(
             modifier = Modifier.weight(1f),
-            state = lazyListState
+            state = lazyListState,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             items(messages) { message ->
                 ChatBubble(
@@ -410,80 +576,325 @@ fun ChatMessages(
                 )
             }
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(LightGrey)
-                .padding(8.dp), 
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Botão de busca
-            IconButton(onClick = {
-                viewModel.toggleSearch()
-            }) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Buscar mensagens",
-                    tint = Color.Blue
-                )
-            }
-            
-            // Botão de anexo
-            IconButton(onClick = {
-                msg.value = ""
-                onAttachmentClicked()
-            }) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Anexar arquivo",
-                    tint = Color.Blue
-                )
-            }
-
-            // Campo de texto
-            TextField(
-                value = msg.value,
-                onValueChange = { msg.value = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(text = "Digite uma mensagem") },
-                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {
-                    hideKeyboardController?.hide()
-                }),
-                colors = TextFieldDefaults.colors().copy(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedTextColor = Color.Black,
-                    unfocusedTextColor = Color.Black,
-                    focusedPlaceholderColor = Color.Gray,
-                    unfocusedPlaceholderColor = Color.Gray
-                )
-            )
-            
-            // Botão de emoji
-            IconButton(onClick = onEmojiClicked) {
-                Icon(
-                    imageVector = Icons.Default.Face,
-                    contentDescription = "Emojis",
-                    tint = Color.Blue
-                )
-            }
-            
-            // Gravador de áudio
-            AudioRecorder(
-                onAudioRecorded = { audioUri, duration ->
-                    onAudioRecorded(audioUri, duration)
-                }
-            )
-            
-            // Botão de enviar
-            IconButton(onClick = {
+        
+        // BARRA DE INPUT MODERNA - Fixa na parte inferior
+        ModernInputBar(
+            message = msg.value,
+            onMessageChange = { msg.value = it },
+            onSendMessage = {
                 if (msg.value.isNotBlank()) {
                     onSendMessage(msg.value)
                     msg.value = ""
                 }
-            }) {
-                Image(painter = painterResource(id = R.drawable.send), contentDescription = "send")
+            },
+            onAttachmentClicked = onAttachmentClicked,
+            onEmojiClicked = onEmojiClicked,
+            onAudioRecorded = onAudioRecorded,
+            hideKeyboardController = hideKeyboardController
+        )
+    }
+}
+
+@Composable
+fun ModernInputBar(
+    message: String,
+    onMessageChange: (String) -> Unit,
+    onSendMessage: () -> Unit,
+    onAttachmentClicked: () -> Unit,
+    onEmojiClicked: () -> Unit,
+    onAudioRecorded: (Uri, Long?) -> Unit,
+    hideKeyboardController: androidx.compose.ui.platform.SoftwareKeyboardController?
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 8.dp,
+        color = Color.White
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Botão de anexo
+            IconButton(
+                onClick = onAttachmentClicked,
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        Color.Gray.copy(alpha = 0.1f),
+                        CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Anexar arquivo",
+                    tint = Color(0xFF0055FF)
+                )
+            }
+
+            // Área central - Campo de texto OU UI de gravação
+            ModernInputContent(
+                message = message,
+                onMessageChange = onMessageChange,
+                onSendMessage = onSendMessage,
+                onEmojiClicked = onEmojiClicked,
+                onAudioRecorded = onAudioRecorded,
+                hideKeyboardController = hideKeyboardController,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun ModernInputContent(
+    message: String,
+    onMessageChange: (String) -> Unit,
+    onSendMessage: () -> Unit,
+    onEmojiClicked: () -> Unit,
+    onAudioRecorded: (Uri, Long?) -> Unit,
+    hideKeyboardController: androidx.compose.ui.platform.SoftwareKeyboardController?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var isRecording by remember { mutableStateOf(false) }
+    var recordingTime by remember { mutableStateOf(0L) }
+    var mediaRecorder: MediaRecorder? by remember { mutableStateOf(null) }
+    var audioFile: File? by remember { mutableStateOf(null) }
+    
+    // Animação para o botão de gravação
+    val infiniteTransition = rememberInfiniteTransition(label = "recording")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ), label = "recording"
+    )
+    
+    // Timer da gravação
+    LaunchedEffect(isRecording) {
+        if (isRecording) {
+            recordingTime = 0L
+            while (isRecording) {
+                delay(1000)
+                recordingTime++
+            }
+        }
+    }
+    
+    // Permissão para gravação de áudio
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            startRecording(context) { recorder, file ->
+                mediaRecorder = recorder
+                audioFile = file
+                isRecording = true
+            }
+        }
+    }
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (isRecording) {
+            // UI de gravação compacta
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        Color.Red.copy(alpha = 0.1f),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Ícone de microfone pulsante
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_microphone),
+                        contentDescription = "Gravando",
+                        tint = Color.Red,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .scale(scale)
+                    )
+                    
+                    // Timer
+                    Text(
+                        text = formatAudioTime(recordingTime),
+                        color = Color.Red,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    
+                    // Ondas sonoras animadas
+                    repeat(3) { 
+                        Box(
+                            modifier = Modifier
+                                .width(2.dp)
+                                .height((8..12).random().dp)
+                                .background(
+                                    Color.Red.copy(alpha = 0.7f),
+                                    RoundedCornerShape(1.dp)
+                                )
+                                .scale(if (isRecording) scale else 1f)
+                        )
+                    }
+                }
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    // Botão cancelar
+                    IconButton(
+                        onClick = {
+                            stopAudioRecording(mediaRecorder, null) { }
+                            isRecording = false
+                            mediaRecorder = null
+                            audioFile = null
+                            recordingTime = 0L
+                        },
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(Color.Red.copy(alpha = 0.2f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cancelar",
+                            tint = Color.Red,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    
+                    // Botão parar e enviar
+                    IconButton(
+                        onClick = {
+                            stopAudioRecording(mediaRecorder, audioFile) { uri ->
+                                onAudioRecorded(uri, recordingTime * 1000)
+                                isRecording = false
+                                mediaRecorder = null
+                                audioFile = null
+                                recordingTime = 0L
+                            }
+                        },
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(Color(0xFF0055FF), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Parar e enviar",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        } else {
+            // Campo de texto normal
+            TextField(
+                value = message,
+                onValueChange = onMessageChange,
+                modifier = Modifier.weight(1f),
+                placeholder = { 
+                    Text(
+                        text = "Digite uma mensagem...",
+                        color = Color.Gray.copy(alpha = 0.6f)
+                    ) 
+                },
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (message.isNotBlank()) {
+                            onSendMessage()
+                        }
+                        hideKeyboardController?.hide()
+                    }
+                ),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Gray.copy(alpha = 0.1f),
+                    unfocusedContainerColor = Color.Gray.copy(alpha = 0.05f),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
+                ),
+                shape = RoundedCornerShape(20.dp),
+                maxLines = 3
+            )
+            
+            // Botão de emoji
+            IconButton(
+                onClick = onEmojiClicked,
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        Color.Gray.copy(alpha = 0.1f),
+                        CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Face,
+                    contentDescription = "Emojis",
+                    tint = Color(0xFF0055FF)
+                )
+            }
+        }
+        
+        // Gravador de áudio ou botão de enviar
+        if (message.isBlank() && !isRecording) {
+            IconButton(
+                onClick = {
+                    if (ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        startRecording(context) { recorder, file ->
+                            mediaRecorder = recorder
+                            audioFile = file
+                            isRecording = true
+                        }
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        Color.Gray.copy(alpha = 0.1f),
+                        CircleShape
+                    )
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_microphone),
+                    contentDescription = "Gravar áudio",
+                    tint = Color(0xFF0055FF),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        } else if (message.isNotBlank()) {
+            IconButton(
+                onClick = onSendMessage,
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color(0xFF0055FF), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Enviar",
+                    tint = Color.White
+                )
             }
         }
     }
@@ -694,12 +1105,19 @@ fun MessageContent(
 
 @Composable
 fun CallButton(isVideoCall: Boolean, onClick: (ZegoSendCallInvitationButton) -> Unit) {
-    AndroidView(factory = { context ->
-        val button = ZegoSendCallInvitationButton(context)
-        button.setIsVideoCall(isVideoCall)
-        button.resourceID = "zego_data"
-        button
-    }, modifier = Modifier.size(50.dp)) { zegoCallButton ->
+    AndroidView(
+        factory = { context ->
+            val button = ZegoSendCallInvitationButton(context)
+            button.setIsVideoCall(isVideoCall)
+            button.resourceID = "zego_data"
+            
+            // Usar ícones padrão do ZEGO (originais)
+            // Removemos a personalização para voltar aos ícones originais
+            
+            button
+        },
+        modifier = Modifier.size(36.dp)
+    ) { zegoCallButton ->
         zegoCallButton.setOnClickListener { _ -> onClick(zegoCallButton) }
     }
 }
@@ -739,9 +1157,11 @@ fun SearchBar(
                 }
             } else null,
             singleLine = true,
-            colors = TextFieldDefaults.colors().copy(
+            colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Gray.copy(alpha = 0.1f),
-                unfocusedContainerColor = Color.Gray.copy(alpha = 0.1f)
+                unfocusedContainerColor = Color.Gray.copy(alpha = 0.1f),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
             )
         )
         
@@ -752,4 +1172,71 @@ fun SearchBar(
             )
         }
     }
+}
+
+private fun startRecording(
+    context: Context,
+    onRecordingStarted: (MediaRecorder, File) -> Unit
+) {
+    try {
+        val audioFile = File(context.externalCacheDir, "audio_${System.currentTimeMillis()}.m4a")
+        
+        val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            MediaRecorder(context)
+        } else {
+            @Suppress("DEPRECATION")
+            MediaRecorder()
+        }
+        
+        recorder.apply {
+            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            setOutputFile(audioFile.absolutePath)
+            setMaxDuration(300000) // 5 minutos max
+            
+            prepare()
+            start()
+        }
+        
+        onRecordingStarted(recorder, audioFile)
+        Log.d("AudioRecorder", "Gravação iniciada: ${audioFile.absolutePath}")
+    } catch (e: IOException) {
+        e.printStackTrace()
+        Log.e("AudioRecorder", "Erro ao iniciar gravação: ${e.message}")
+    } catch (e: RuntimeException) {
+        e.printStackTrace()
+        Log.e("AudioRecorder", "Erro de runtime na gravação: ${e.message}")
+    }
+}
+
+private fun stopAudioRecording(
+    mediaRecorder: MediaRecorder?,
+    audioFile: File?,
+    onRecordingStopped: (Uri) -> Unit
+) {
+    try {
+        mediaRecorder?.apply {
+            stop()
+            release()
+        }
+        
+        audioFile?.let { file ->
+            if (file.exists() && file.length() > 0) {
+                Log.d("AudioRecorder", "Gravação salva: ${file.absolutePath}, tamanho: ${file.length()}")
+                onRecordingStopped(Uri.fromFile(file))
+            } else {
+                Log.e("AudioRecorder", "Arquivo de áudio não existe ou está vazio")
+            }
+        }
+    } catch (e: RuntimeException) {
+        e.printStackTrace()
+        Log.e("AudioRecorder", "Erro ao parar gravação: ${e.message}")
+    }
+}
+
+private fun formatAudioTime(seconds: Long): String {
+    val minutes = seconds / 60
+    val remainingSeconds = seconds % 60
+    return String.format("%02d:%02d", minutes, remainingSeconds)
 }
