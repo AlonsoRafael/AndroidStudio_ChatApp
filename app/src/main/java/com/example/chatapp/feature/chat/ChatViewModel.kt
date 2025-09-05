@@ -460,9 +460,148 @@ class ChatViewModel @Inject constructor(@ApplicationContext val context: Context
         }
     }
 
+    // ===== FUNCIONALIDADES DE MENSAGENS FIXADAS =====
+    
+    private val _pinnedMessage = MutableStateFlow<Message?>(null)
+    val pinnedMessage = _pinnedMessage.asStateFlow()
+
+    fun pinMessage(channelID: String, message: Message) {
+        val currentUser = Firebase.auth.currentUser ?: return
+        
+        val messagesRef = if (isPrivateChat(channelID)) {
+            db.reference.child("private_messages").child(channelID)
+        } else {
+            db.reference.child("messages").child(channelID)
+        }
+        
+        // Primeiro, desfixa qualquer mensagem já fixada
+        unpinCurrentMessage(channelID) {
+            // Depois fixa a nova mensagem
+            val updatedMessage = message.copy(
+                isPinned = true,
+                pinnedAt = System.currentTimeMillis(),
+                pinnedBy = currentUser.uid
+            )
+            
+            messagesRef.orderByChild("id").equalTo(message.id).addListenerForSingleValueEvent(
+                object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        snapshot.children.firstOrNull()?.let { messageSnapshot ->
+                            messageSnapshot.ref.setValue(updatedMessage)
+                                .addOnSuccessListener {
+                                    _pinnedMessage.value = updatedMessage
+                                    Log.d("ChatViewModel", "Mensagem fixada com sucesso: ${message.id}")
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("ChatViewModel", "Erro ao fixar mensagem: ${e.message}")
+                                }
+                        }
+                    }
+                    
+                    override fun onCancelled(error: DatabaseError) {
+                        Log.e("ChatViewModel", "Erro ao buscar mensagem para fixar: ${error.message}")
+                    }
+                }
+            )
+        }
+    }
+
+    fun unpinMessage(channelID: String, message: Message) {
+        val messagesRef = if (isPrivateChat(channelID)) {
+            db.reference.child("private_messages").child(channelID)
+        } else {
+            db.reference.child("messages").child(channelID)
+        }
+        
+        val updatedMessage = message.copy(
+            isPinned = false,
+            pinnedAt = null,
+            pinnedBy = null
+        )
+        
+        messagesRef.orderByChild("id").equalTo(message.id).addListenerForSingleValueEvent(
+            object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    snapshot.children.firstOrNull()?.let { messageSnapshot ->
+                        messageSnapshot.ref.setValue(updatedMessage)
+                            .addOnSuccessListener {
+                                _pinnedMessage.value = null
+                                Log.d("ChatViewModel", "Mensagem desfixada com sucesso: ${message.id}")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("ChatViewModel", "Erro ao desafixar mensagem: ${e.message}")
+                            }
+                    }
+                }
+                
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("ChatViewModel", "Erro ao buscar mensagem para desafixar: ${error.message}")
+                }
+            }
+        )
+    }
+    
+    private fun unpinCurrentMessage(channelID: String, onComplete: () -> Unit) {
+        val messagesRef = if (isPrivateChat(channelID)) {
+            db.reference.child("private_messages").child(channelID)
+        } else {
+            db.reference.child("messages").child(channelID)
+        }
+        
+        messagesRef.orderByChild("isPinned").equalTo(true).addListenerForSingleValueEvent(
+            object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (snapshot.exists()) {
+                        snapshot.children.forEach { messageSnapshot ->
+                            val message = messageSnapshot.getValue(Message::class.java)
+                            message?.let {
+                                val updatedMessage = it.copy(
+                                    isPinned = false,
+                                    pinnedAt = null,
+                                    pinnedBy = null
+                                )
+                                messageSnapshot.ref.setValue(updatedMessage)
+                            }
+                        }
+                    }
+                    onComplete()
+                }
+                
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("ChatViewModel", "Erro ao desafixar mensagem atual: ${error.message}")
+                    onComplete()
+                }
+            }
+        )
+    }
+    
+    private fun loadPinnedMessage(channelID: String) {
+        val messagesRef = if (isPrivateChat(channelID)) {
+            db.reference.child("private_messages").child(channelID)
+        } else {
+            db.reference.child("messages").child(channelID)
+        }
+        
+        messagesRef.orderByChild("isPinned").equalTo(true).addListenerForSingleValueEvent(
+            object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val pinnedMessage = snapshot.children.firstOrNull()?.getValue(Message::class.java)
+                    _pinnedMessage.value = pinnedMessage
+                }
+                
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("ChatViewModel", "Erro ao carregar mensagem fixada: ${error.message}")
+                }
+            }
+        )
+    }
+
     fun listenForMessages(channelID: String) {
         val isPrivate = isPrivateChat(channelID)
         Log.d("ChatViewModel", "📋 listenForMessages - channelID: $channelID, isPrivateChat: $isPrivate")
+        
+        // Carregar mensagem fixada
+        loadPinnedMessage(channelID)
         
         val messagesRef = if (isPrivate) {
             val path = "private_messages/$channelID"

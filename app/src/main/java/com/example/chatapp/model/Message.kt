@@ -16,5 +16,8 @@ data class Message(
     val audioDuration: Long? = null, // Duração do áudio em milissegundos
     val messageType: String = MessageType.TEXT.name, // Tipo da mensagem
     val status: String = MessageStatus.SENDING.name, // Status da mensagem
-    val readBy: Map<String, Long> = emptyMap() // Map de userId -> timestamp quando leu
+    val readBy: Map<String, Long> = emptyMap(), // Map de userId -> timestamp quando leu
+    val isPinned: Boolean = false, // Se a mensagem está fixada
+    val pinnedAt: Long? = null, // Timestamp quando foi fixada
+    val pinnedBy: String? = null // ID do usuário que fixou a mensagem
 )

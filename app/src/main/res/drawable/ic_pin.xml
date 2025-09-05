@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorOnSurface">
+    
+    <!-- Pin moderno e minimalista -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12,2L14,4V12L16,14V16H13V22L12,21L11,22V16H8V14L10,12V4L12,2Z"/>
+    
+</vector>

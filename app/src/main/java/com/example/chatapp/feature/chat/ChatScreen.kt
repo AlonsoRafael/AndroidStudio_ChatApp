@@ -82,6 +82,8 @@ import coil.compose.AsyncImage
 import com.example.chatapp.R
 import com.example.chatapp.model.Message
 import com.example.chatapp.model.MessageType
+import com.example.chatapp.ui.component.PinnedMessageCard
+import com.example.chatapp.ui.component.MessageContextMenu
 import com.example.chatapp.ui.theme.Blue
 import com.example.chatapp.ui.theme.DarkGrey
 import com.example.chatapp.ui.theme.LightGrey
@@ -187,9 +189,24 @@ fun ChatScreen(navController: NavController, channelId: String, channelName: Str
             }
             
             val messages = viewModel.message.collectAsState()
+            val pinnedMessage = viewModel.pinnedMessage.collectAsState()
+            
+            // Mensagem fixada (se existir)
+            pinnedMessage.value?.let { pinned ->
+                PinnedMessageCard(
+                    message = pinned,
+                    onUnpin = { viewModel.unpinMessage(channelId, pinned) },
+                    onClick = {
+                        // Scroll para a mensagem fixada na lista
+                        // Implementar se necessário
+                    },
+                    canUnpin = true
+                )
+            }
             
             ChatMessages(
                 messages = messages.value,
+                channelId = channelId,
                 onSendMessage = { message ->
                     viewModel.sendMessage(channelId, message)
                 },
@@ -550,6 +567,7 @@ fun AttachmentSelectionDialog(
 @Composable
 fun ChatMessages(
     messages: List<Message>,
+    channelId: String,
     onSendMessage: (String) -> Unit,
     onAttachmentClicked: () -> Unit,
     onEmojiClicked: () -> Unit,
@@ -577,10 +595,13 @@ fun ChatMessages(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             items(messages) { message ->
-                ChatBubble(
-                    message = message, 
+                MessageWithContextMenu(
+                    message = message,
                     navController = navController,
-                    searchQuery = viewModel.searchQuery.collectAsState().value
+                    searchQuery = viewModel.searchQuery.collectAsState().value,
+                    onPinMessage = { viewModel.pinMessage(channelId, message) },
+                    onUnpinMessage = { viewModel.unpinMessage(channelId, message) },
+                    canPin = true // ou baseado em permissões do usuário
                 )
             }
         }
@@ -909,7 +930,37 @@ fun ModernInputContent(
 }
 
 @Composable
-fun ChatBubble(message: Message, navController: NavController, searchQuery: String = "") {
+fun MessageWithContextMenu(
+    message: Message,
+    navController: NavController,
+    searchQuery: String = "",
+    onPinMessage: () -> Unit,
+    onUnpinMessage: () -> Unit,
+    canPin: Boolean = true
+) {
+    var showContextMenu by remember { mutableStateOf(false) }
+    
+    Box {
+        ChatBubble(
+            message = message,
+            navController = navController,
+            searchQuery = searchQuery,
+            onLongClick = { showContextMenu = true }
+        )
+        
+        MessageContextMenu(
+            message = message,
+            isVisible = showContextMenu,
+            onDismiss = { showContextMenu = false },
+            onPin = onPinMessage,
+            onUnpin = onUnpinMessage,
+            canPin = canPin
+        )
+    }
+}
+
+@Composable
+fun ChatBubble(message: Message, navController: NavController, searchQuery: String = "", onLongClick: (() -> Unit)? = null) {
     // Log para debug de renderização
     Log.d("ChatScreen", "🎨 Renderizando mensagem: type=${message.messageType}, sender=${message.senderName}")
     if (message.messageType == MessageType.STICKER.name) {
@@ -931,6 +982,17 @@ fun ChatBubble(message: Message, navController: NavController, searchQuery: Stri
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp, horizontal = 8.dp)
+            .let { modifier ->
+                if (onLongClick != null) {
+                    modifier.pointerInput(message.id) {
+                        detectTapGestures(
+                            onLongPress = { onLongClick() }
+                        )
+                    }
+                } else {
+                    modifier
+                }
+            }
     ) {
         val alignment = if (!isCurrentUser) Alignment.CenterStart else Alignment.CenterEnd
         
