@@ -20,8 +20,8 @@ data class FileInfo(
 class SupabaseStorageUtils(val context: Context) {
 
     val supabase = createSupabaseClient(
-        "https://zkxtmotutndlnzzfhlbr.supabase.co",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpreHRtb3R1dG5kbG56emZobGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyOTkzMjEsImV4cCI6MjA3MTg3NTMyMX0.8Q5wlmzsQ7v2CLYlARA05mE4BwUkr5ZATKd1Ysu4cGs"
+        "YOUR_SUPABASE_URL_HERE", // Substitua pela sua URL do Supabase
+        "YOUR_SUPABASE_ANON_KEY_HERE" // Substitua pela sua chave anon do Supabase
     ) {
         install(Storage)
     }

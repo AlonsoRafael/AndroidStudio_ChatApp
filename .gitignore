@@ -13,3 +13,14 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Arquivos sensíveis - NÃO COMMITAR
+app/google-services.json
+app/src/main/java/com/example/chatapp/Const.kt
+keystore.properties
+*.keystore
+*.jks
+
+# Configurações locais
+config.properties
+secrets.properties

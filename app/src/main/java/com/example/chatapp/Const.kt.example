@@ -1,0 +1,7 @@
+package com.example.chatapp
+
+// EXEMPLO - Copie este arquivo para Const.kt e substitua pelos seus valores reais
+// Obtenha suas credenciais em: https://console.zegocloud.com/
+
+val AppID: Long = YOUR_ZEGO_APP_ID_HERE
+val AppSign = "YOUR_ZEGO_APP_SIGN_HERE"
