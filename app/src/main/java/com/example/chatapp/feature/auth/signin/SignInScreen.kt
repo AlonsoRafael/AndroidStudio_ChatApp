@@ -57,7 +57,7 @@ fun SignInScreen(navController: NavController) {
             }
 
             is SignInState.Error -> {
-                Toast.makeText(context, "Sign In failed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Falha no login", Toast.LENGTH_SHORT).show()
             }
 
             else -> {}
@@ -89,7 +89,7 @@ fun SignInScreen(navController: NavController) {
                 value = password,
                 onValueChange = { password = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = "Password") },
+                label = { Text(text = "Senha") },
                 visualTransformation = PasswordVisualTransformation()
             )
             Spacer(modifier = Modifier.size(16.dp))
@@ -102,7 +102,7 @@ fun SignInScreen(navController: NavController) {
                     modifier = Modifier.fillMaxWidth(),
                     enabled = email.isNotEmpty() && password.isNotEmpty() && (uiState.value == SignInState.Nothing || uiState.value == SignInState.Error)
                 ) {
-                    Text(text = "Sign In")
+                    Text(text = "Entrar")
                 }
 
                 Spacer(modifier = Modifier.size(8.dp))
@@ -112,7 +112,7 @@ fun SignInScreen(navController: NavController) {
                 }
 
                 TextButton(onClick = { navController.navigate("signup") }) {
-                    Text(text = "Don't have an account? Sign Up")
+                    Text(text = "Não tem uma conta? Cadastre-se")
                 }
             }
         }

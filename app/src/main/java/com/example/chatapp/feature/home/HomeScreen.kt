@@ -101,7 +101,7 @@ fun HomeScreen(navController: NavController) {
             LazyColumn {
                 item {
                     Text(
-                        text = "Messages",
+                        text = "Mensagens",
                         color = Color.Gray,
                         style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Black),
                         modifier = Modifier.padding(16.dp)
@@ -112,7 +112,7 @@ fun HomeScreen(navController: NavController) {
                     TextField(
                         value = searchQuery.value,
                         onValueChange = { searchQuery.value = it },
-                        placeholder = { Text(text = "Search...") },
+                        placeholder = { Text(text = "Pesquisar...") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)

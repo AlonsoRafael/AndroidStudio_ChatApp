@@ -59,6 +59,7 @@ class MainActivity : FragmentActivity() {
     fun initZegoService(appID: Long, appSign: String, userID: String, userName: String) {
         // Initialize Zego service
         val callInvitationConfig = ZegoUIKitPrebuiltCallInvitationConfig()
+        // Configurando para português se disponível, senão mantém inglês
         callInvitationConfig.translationText = ZegoTranslationText(ZegoUIKitLanguage.ENGLISH)
         callInvitationConfig.provider =
             ZegoUIKitPrebuiltCallConfigProvider { invitationData: ZegoCallInvitationData? ->

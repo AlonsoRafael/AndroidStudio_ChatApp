@@ -60,7 +60,7 @@ fun SignUpScreen(navController: NavController) {
             }
 
             is SignUpState.Error -> {
-                Toast.makeText(context, "Sign In failed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Falha no cadastro", Toast.LENGTH_SHORT).show()
             }
 
             else -> {}
@@ -86,7 +86,7 @@ fun SignUpScreen(navController: NavController) {
             OutlinedTextField(value = name,
                 onValueChange = { name = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = "Full Name") })
+                label = { Text(text = "Nome Completo") })
 
             OutlinedTextField(value = email,
                 onValueChange = { email = it },
@@ -95,13 +95,13 @@ fun SignUpScreen(navController: NavController) {
             OutlinedTextField(
                 value = password, onValueChange = { password = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = "Password") },
+                label = { Text(text = "Senha") },
                 visualTransformation = PasswordVisualTransformation()
             )
             OutlinedTextField(
                 value = confirm, onValueChange = { confirm = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = "Confirm Password") },
+                label = { Text(text = "Confirmar Senha") },
                 visualTransformation = PasswordVisualTransformation(),
                 isError = password.isNotEmpty() && confirm.isNotEmpty() && password != confirm
             )
@@ -115,10 +115,10 @@ fun SignUpScreen(navController: NavController) {
                     }, modifier = Modifier.fillMaxWidth(),
                     enabled = name.isNotEmpty() && email.isNotEmpty() && password.isNotEmpty() && confirm.isNotEmpty() && password == confirm
                 ) {
-                    Text(text = "Sign Up")
+                    Text(text = "Cadastrar")
                 }
                 TextButton(onClick = { navController.popBackStack() }) {
-                    Text(text = "Already have an account? Sign In")
+                    Text(text = "Já tem uma conta? Entrar")
                 }
             }
 
